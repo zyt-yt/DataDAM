@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from torchvision import transforms
 from torch.utils.data.distributed import DistributedSampler
 import kornia as K
+from torchvision.utils import save_image
 import torch.distributed as dist
 import torch.cuda.comm
 
@@ -24,7 +25,7 @@ def main():
     parser.add_argument('--num_exp', type=int, default=1, help='the number of experiments')
     parser.add_argument('--num_eval', type=int, default=10, help='the number of evaluating randomly initialized models')
     parser.add_argument('--epoch_eval_train', type=int, default=1800, help='epochs to train a model with synthetic data')
-    parser.add_argument('--Iteration', type=int, default=20000, help='training iterations')
+    parser.add_argument('--Iteration', type=int, default=8000, help='training iterations')
     parser.add_argument('--lr_img', type=float, default=1, help='learning rate for updating synthetic images, 1 for low IPCs 10 for >= 100')
     parser.add_argument('--lr_net', type=float, default=0.01, help='learning rate for updating network parameters')
     parser.add_argument('--batch_real', type=int, default=64, help='batch size for real data')
@@ -48,8 +49,10 @@ def main():
     if not os.path.exists(args.save_path):
         os.mkdir(args.save_path)
 
-    eval_it_pool = np.arange(0, args.Iteration+1, 2000).tolist()[:] if args.eval_mode == 'S' or args.eval_mode == 'SS' else [args.Iteration] # The list of iterations when we evaluate models and record results.
+    eval_it_pool = np.arange(0, args.Iteration+1, 500).tolist()[:] if args.eval_mode == 'S' or args.eval_mode == 'SS' else [args.Iteration] # The list of iterations when we evaluate models and record results.
+    # eval_it_pool = [0, 15, 30]
     print('eval_it_pool: ', eval_it_pool)
+    
     
     channel, im_size, num_classes, class_names, mean, std, dst_train, dst_test, testloader, zca = get_dataset(args.dataset, args.data_path, args)
     model_eval_pool = get_eval_pool(args.eval_mode, args.model, args.model)
@@ -206,7 +209,9 @@ def main():
                     if np.mean(accs) > max_mean:
                         data=[]
                         data_save.append([copy.deepcopy(image_syn.detach().cpu()), copy.deepcopy(label_syn.detach().cpu())])
-                        torch.save({'data': data_save, 'accs_all_exps': accs_all_exps, }, os.path.join(args.save_path, 'res_%s_%s_%s_%dipc_.pt'%(args.method, args.dataset, args.model, args.ipc)))
+                        torch.save({'data': data_save, 'accs_all_exps': accs_all_exps, }, os.path.join(args.save_path, 'res_%s_%s_%s_%dipc_%d.pt'%(args.method, args.dataset, args.model, args.ipc, it)))
+
+                    
                     # Track All of them!
                     total_mean[exp]['mean'].append(np.mean(accs))
                     total_mean[exp]['std'].append(np.std(accs))
@@ -220,13 +225,13 @@ def main():
                         accs_all_exps[model_eval] += accs
 
                 ''' visualize and save '''
-                # save_name = os.path.join(args.save_path, 'vis_%s_%s_%s_%dipc_exp%d_iter%d.png'%(args.method, args.dataset, args.model, args.ipc, exp, it))
-                # image_syn_vis = copy.deepcopy(image_syn.detach().cpu())
-                # for ch in range(channel):
-                #     image_syn_vis[:, ch] = image_syn_vis[:, ch]  * std[ch] + mean[ch]
-                # image_syn_vis[image_syn_vis<0] = 0.0
-                # image_syn_vis[image_syn_vis>1] = 1.0
-                # save_image(image_syn_vis, save_name, nrow=args.ipc) # Trying normalize = True/False may get better visual effects.
+                save_name = os.path.join(args.save_path, 'vis_%s_%s_%s_%dipc_exp%d_iter%d.png'%(args.method, args.dataset, args.model, args.ipc, exp, it))
+                image_syn_vis = copy.deepcopy(image_syn.detach().cpu())
+                for ch in range(channel):
+                    image_syn_vis[:, ch] = image_syn_vis[:, ch]  * std[ch] + mean[ch]
+                image_syn_vis[image_syn_vis<0] = 0.0
+                image_syn_vis[image_syn_vis>1] = 1.0
+                save_image(image_syn_vis, save_name, nrow=args.ipc) # Trying normalize = True/False may get better visual effects.
 
             ''' Train synthetic data '''
             net = get_network(args.model, channel, num_classes, im_size).to(args.device) # get a random model

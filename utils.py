@@ -440,7 +440,8 @@ def evaluate_synset(it_eval, net, images_train, labels_train, testloader, args, 
     time_train = 0
     acc_train = 0
     if not skip:
-        for ep in tqdm.tqdm(range(Epoch+1)):
+        for ep in (range(Epoch+1)):
+        #for ep in tqdm.tqdm(range(Epoch+1)):
             loss_train, acc_train = epoch('train', trainloader, net, optimizer, criterion, args, aug = True)
             if ep in lr_schedule:
                 lr *= 0.1
