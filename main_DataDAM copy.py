@@ -195,6 +195,8 @@ def main():
                     for it_eval in range(args.num_eval):
                         net_eval = get_network(model_eval, channel, num_classes, im_size).to(args.device) # get a random model
                         image_syn_eval, label_syn_eval = copy.deepcopy(image_syn.detach()), copy.deepcopy(label_syn.detach()) # avoid any unaware modification
+                        if args.zca:
+                            image_syn_eval = args.zca_trans.inverse_transform(image_syn_eval)
                         mini_net, acc_train, acc_test = evaluate_synset(it_eval, net_eval, image_syn_eval, label_syn_eval, testloader, args)
                         accs.append(acc_test)
                         if acc_test > best_5[-1]:
@@ -208,7 +210,13 @@ def main():
                     print('Evaluate %d random %s, mean = %.4f std = %.4f\n-------------------------'%(len(accs), model_eval, np.mean(accs), np.std(accs)))
                     if np.mean(accs) > max_mean:
                         data=[]
-                        data_save.append([copy.deepcopy(image_syn.detach().cpu()), copy.deepcopy(label_syn.detach().cpu())])
+                        if args.zca:
+                            image_save = copy.deepcopy(image_syn.detach().cpu())
+                            image_save = args.zca_trans.inverse_transform(image_save)
+                            data_save.append([image_save, copy.deepcopy(label_syn.detach().cpu())])
+                        else:
+                            data_save.append([copy.deepcopy(image_syn.detach().cpu()), copy.deepcopy(label_syn.detach().cpu())])
+                        image_save = args.zca_trans.inverse_transform(image_save)
                         torch.save({'data': data_save, 'accs_all_exps': accs_all_exps, }, os.path.join(args.save_path, 'res_%s_%s_%s_%dipc_%d.pt'%(args.method, args.dataset, args.model, args.ipc, it)))
 
                     
@@ -227,6 +235,8 @@ def main():
                 ''' visualize and save '''
                 save_name = os.path.join(args.save_path, 'vis_%s_%s_%s_%dipc_exp%d_iter%d.png'%(args.method, args.dataset, args.model, args.ipc, exp, it))
                 image_syn_vis = copy.deepcopy(image_syn.detach().cpu())
+                if args.zca:
+                    image_syn_vis = args.zca_trans.inverse_transform(image_syn_vis)
                 for ch in range(channel):
                     image_syn_vis[:, ch] = image_syn_vis[:, ch]  * std[ch] + mean[ch]
                 image_syn_vis[image_syn_vis<0] = 0.0

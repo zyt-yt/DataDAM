@@ -49,24 +49,29 @@ def main():
     if not os.path.exists(args.save_path):
         os.mkdir(args.save_path)
 
-    args.save_path += "/{}".format(args.dataset.lower())
+    # args.save_path += "/{}".format(args.dataset.lower())
     channel, im_size, num_classes, class_names, mean, std, dst_train, dst_test, testloader, zca = get_dataset(args.dataset, args.data_path, args)
     model_eval_pool = get_eval_pool(args.eval_mode, args.model, args.model)
 
 
     model_eval = model_eval_pool[0]
-
-    data_save = torch.load(os.path.join(args.save_path, 'syn_data_%s_ipc_%d.pt'%(args.dataset.lower(), args.ipc)))["data"]
+    print("model eval is: %s"%model_eval)
+    #original dont need [0]
+    #data_save = torch.load(os.path.join(args.save_path, 'syn_data_%s_ipc_%d.pt'%(args.dataset.lower(), args.ipc)))["data"][0]
+    data_save = torch.load(os.path.join(args.save_path, 'ori.pt'))["data"]
 
     image_syn_eval = torch.tensor(data_save[0])
+    # print(image_syn_eval)
     label_syn_eval = torch.tensor(data_save[1])
+
     net_model_dict = torch.load(os.path.join(args.save_path, 'model_params_%s_ipc_%d.pt'%(args.dataset.lower(), args.ipc)))["net_parameters"]
     
     net_eval = get_network(model_eval, channel, num_classes, im_size).to(args.device) # get a random model
 
-    net_eval.load_state_dict(net_model_dict) # load the state dict
-    _, _, acc_test = evaluate_synset(-1, net_eval, image_syn_eval, label_syn_eval, testloader, args, skip=True) # evaluate the model
-    print("Trained Model Best", acc_test)
+    # net_eval.load_state_dict(net_model_dict) # load the state dict
+    for i in range(10):
+        _, _, acc_test = evaluate_synset(i, net_eval, image_syn_eval, label_syn_eval, testloader, args, skip=False) # evaluate the model
+        print("Trained Model Best", acc_test)
 
 main()
 
